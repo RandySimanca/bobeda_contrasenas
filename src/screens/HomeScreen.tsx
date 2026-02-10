@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, StatusBar, Clipboard, Alert } from 'react-native';
+import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, StatusBar, Clipboard, Alert, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useVault } from '../context/VaultContext';
 import { searchPasswords, RegistroAcceso, deletePassword } from '../utils/database';
@@ -14,8 +14,12 @@ export default function HomeScreen({ navigation }: any) {
     const { encryptionKey, lock } = useVault();
 
     const loadData = useCallback(async () => {
-        const data = await searchPasswords(searchQuery);
-        setRegistros(data);
+        try {
+            const data = await searchPasswords(searchQuery);
+            setRegistros(data);
+        } catch (error: any) {
+            Alert.alert('Error', 'No se pudieron cargar los datos: ' + error.message);
+        }
     }, [searchQuery]);
 
     useEffect(() => {
@@ -63,8 +67,16 @@ export default function HomeScreen({ navigation }: any) {
         }
     };
 
+    const [showExportModal, setShowExportModal] = useState(false);
+    const [backupName, setBackupName] = useState(`respaldo_boveda_${new Date().toISOString().split('T')[0]}`);
+
     const handleExport = async () => {
-        await exportBackup();
+        setShowExportModal(true);
+    };
+
+    const confirmExport = async () => {
+        setShowExportModal(false);
+        await exportBackup(backupName);
     };
 
     const handleImport = async () => {
@@ -209,6 +221,47 @@ export default function HomeScreen({ navigation }: any) {
             >
                 <Text style={styles.fabText}>+</Text>
             </TouchableOpacity>
+
+            <Modal
+                visible={showExportModal}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowExportModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                        style={styles.modalContent}
+                    >
+                        <Text style={styles.modalTitle}>Nombre del Respaldo</Text>
+                        <Text style={styles.modalSubtitle}>Dale un nombre a tu copia de seguridad para identificarla después.</Text>
+
+                        <TextInput
+                            style={styles.modalInput}
+                            value={backupName}
+                            onChangeText={setBackupName}
+                            placeholder="Ej: respaldo_trabajo"
+                            placeholderTextColor="#64748B"
+                            autoFocus
+                        />
+
+                        <View style={styles.modalActions}>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.cancelButton]}
+                                onPress={() => setShowExportModal(false)}
+                            >
+                                <Text style={styles.cancelButtonText}>Cancelar</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.confirmButton]}
+                                onPress={confirmExport}
+                            >
+                                <Text style={styles.confirmButtonText}>Guardar</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </KeyboardAvoidingView>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -395,5 +448,76 @@ const styles = StyleSheet.create({
         color: '#FFF',
         fontSize: 30,
         fontWeight: 'bold',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    modalContent: {
+        backgroundColor: '#1E293B',
+        borderRadius: 20,
+        padding: 24,
+        width: '100%',
+        maxWidth: 400,
+        borderWidth: 1,
+        borderColor: '#334155',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.5,
+        shadowRadius: 20,
+        elevation: 10,
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#F8FAFC',
+        marginBottom: 8,
+    },
+    modalSubtitle: {
+        fontSize: 14,
+        color: '#94A3B8',
+        marginBottom: 20,
+        lineHeight: 20,
+    },
+    modalInput: {
+        backgroundColor: '#0F172A',
+        borderRadius: 12,
+        padding: 12,
+        color: '#F8FAFC',
+        fontSize: 16,
+        borderWidth: 1,
+        borderColor: '#334155',
+        marginBottom: 24,
+    },
+    modalActions: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        gap: 12,
+    },
+    modalButton: {
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        borderRadius: 10,
+        minWidth: 100,
+        alignItems: 'center',
+    },
+    cancelButton: {
+        backgroundColor: 'transparent',
+    },
+    cancelButtonText: {
+        color: '#94A3B8',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    confirmButton: {
+        backgroundColor: '#3B82F6',
+    },
+    confirmButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '600',
     },
 });

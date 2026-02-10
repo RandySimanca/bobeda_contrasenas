@@ -8,6 +8,7 @@ import SetupScreen from './src/screens/SetupScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import AddEditScreen from './src/screens/AddEditScreen';
+import UpdateHandler from './src/components/UpdateHandler';
 
 const Stack = createNativeStackNavigator();
 
@@ -53,6 +54,7 @@ export default function App() {
     <SafeAreaProvider>
       <VaultProvider>
         <NavigationContainer>
+          <UpdateHandler />
           <Navigation />
         </NavigationContainer>
       </VaultProvider>

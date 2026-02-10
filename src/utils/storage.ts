@@ -2,37 +2,56 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import { Alert } from 'react-native';
+import { checkpointDatabase, closeDb } from './database';
 
 const DB_NAME = 'vault.db';
 const DB_PATH = `${FileSystem.documentDirectory}SQLite/${DB_NAME}`;
 
-export const exportBackup = async () => {
+export const exportBackup = async (customName?: string) => {
   try {
+    await checkpointDatabase();
     const fileInfo = await FileSystem.getInfoAsync(DB_PATH);
     if (!fileInfo.exists) {
       Alert.alert('Error', 'No se encontró la base de datos para respaldar');
       return;
     }
 
-    // Asegurarse de que Sharing esté disponible
-    if (!(await Sharing.isAvailableAsync())) {
-      Alert.alert('Error', 'La función de compartir no está disponible en este dispositivo');
+    const { StorageAccessFramework } = FileSystem;
+    const permissions = await StorageAccessFramework.requestDirectoryPermissionsAsync();
+
+    if (!permissions.granted) {
+      Alert.alert('Permiso Denegado', 'Necesitas dar permiso para guardar el archivo.');
       return;
     }
 
-    // Copiar a un lugar temporal con un nombre más descriptivo
-    const backupName = `respaldo_boveda_${new Date().toISOString().split('T')[0]}.db`;
-    const tempPath = `${FileSystem.cacheDirectory}${backupName}`;
-    await FileSystem.copyAsync({
-      from: DB_PATH,
-      to: tempPath,
-    });
+    let backupName = customName || `respaldo_boveda_${new Date().toISOString().split('T')[0]}`;
+    if (!backupName.toLowerCase().endsWith('.db')) {
+        backupName += '.db';
+    }
+    
+    // Cerrar la base de datos para asegurar que el archivo físico esté completo y libre
+    await closeDb();
 
-    await Sharing.shareAsync(tempPath, {
-      mimeType: 'application/octet-stream',
-      dialogTitle: 'Guardar copia de seguridad',
-      UTI: 'public.database',
-    });
+    // Leer el contenido de la base de datos
+    const content = await FileSystem.readAsStringAsync(DB_PATH, { encoding: FileSystem.EncodingType.Base64 });
+    
+    if (!content || content.length < 10) {
+        Alert.alert('Error', 'El archivo de base de datos está vacío o es demasiado pequeño. Intenta añadir un registro antes de exportar.');
+        return;
+    }
+
+    // Crear el archivo en la ubicación seleccionada
+    const fileUri = await StorageAccessFramework.createFileAsync(
+      permissions.directoryUri,
+      backupName,
+      'application/octet-stream'
+    );
+
+    // Escribir en el nuevo archivo
+    await FileSystem.writeAsStringAsync(fileUri, content, { encoding: FileSystem.EncodingType.Base64 });
+
+    const sizeKB = Math.round(content.length * 0.75 / 1024); // Estimación del tamaño real en bytes
+    Alert.alert('Éxito', `Copia de seguridad guardada correctamente (${sizeKB} KB) como: ${backupName}`);
   } catch (error) {
     console.error('Error al exportar:', error);
     Alert.alert('Error', 'No se pudo generar la copia de seguridad');
@@ -65,11 +84,23 @@ export const importBackup = async (onComplete: () => void) => {
         if (!confirm) return;
     }
 
+    // Cerrar conexión actual antes de manipular archivos
+    await closeDb();
+
     // Asegurar que el directorio SQLite exista
     const sqliteDir = `${FileSystem.documentDirectory}SQLite/`;
     const dirInfo = await FileSystem.getInfoAsync(sqliteDir);
     if (!dirInfo.exists) {
       await FileSystem.makeDirectoryAsync(sqliteDir, { intermediates: true });
+    }
+
+    // ELIMINAR archivos previos para evitar conflictos de WAL/SHM
+    const sidecarFiles = [DB_PATH, `${DB_PATH}-wal`, `${DB_PATH}-shm`, `${DB_PATH}-journal`];
+    for (const file of sidecarFiles) {
+        const info = await FileSystem.getInfoAsync(file);
+        if (info.exists) {
+            await FileSystem.deleteAsync(file, { idempotent: true });
+        }
     }
 
     // Sobreescribir la base de datos actual

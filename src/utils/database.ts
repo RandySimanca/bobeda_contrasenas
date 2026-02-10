@@ -2,6 +2,18 @@ import * as SQLite from 'expo-sqlite';
 
 let db: SQLite.SQLiteDatabase | null = null;
 
+export const checkpointDatabase = async () => {
+    const database = await getDb();
+    await database.execAsync('PRAGMA wal_checkpoint(TRUNCATE);');
+};
+
+export const closeDb = async () => {
+    if (db) {
+        await db.closeAsync();
+        db = null;
+    }
+};
+
 export const initDatabase = async () => {
   if (!db) {
     db = await SQLite.openDatabaseAsync('vault.db');
