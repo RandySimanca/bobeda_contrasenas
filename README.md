@@ -10,7 +10,7 @@
 - **Contraseña Maestra**: Una única llave protegida con `expo-secure-store` para acceder a todo tu baúl.
 - **Acceso Biométrico**: Desbloquea tu bóveda rápidamente con tu huella dactilar o reconocimiento facial.
 - **Sistema de Backups Robusto**:
-  - Exporta tus datos a archivos `.db` con nombres personalizados.
+  - Exporta tus datos a archivos `.db`.
   - Almacenamiento directo en carpetas del sistema (como Descargas) mediante `StorageAccessFramework`.
   - Validación de integridad para asegurar que tus respaldos nunca estén vacíos.
 - **Actualizaciones Inalámbricas (OTA)**: Recibe mejoras y correcciones al instante sin necesidad de reinstalar la app manualmente, gracias a Expo Updates.
